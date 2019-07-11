@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+	<title>H3</title>
+	
+	<link rel="stylesheet" href="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/css/ol.css" type="text/css">
+	<style type="text/css">
+		body {
+			font-family: Arial;
+			overflow-y: scroll;
+		}
+		#map {
+			height: 800px;
+			width: 100%;
+			border: 1px solid #ddd;
+		}
+		#info {
+			font-size: 11px;
+		}
+	</style>
+	
+	<script src="h3-js.js" type="text/javascript"></script>
+	<script src="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/build/ol.js"></script>
+</head>
+<body>
+	<h3>Interactive H3</h3>
+
+	Click on the map to visualize the highest-resolution hexagon and all of its ancestors.
+
+	<div id="map"></div>
+	<pre id="info"></pre>
+
+	<script type="text/javascript">
+		var cellSource = new ol.source.Vector();
+		var cellLayer = new ol.layer.Vector({
+			source: cellSource,
+			style: new ol.style.Style({
+				stroke: new ol.style.Stroke({
+					width: 1,
+					color: '#ff0000'
+				}),
+				fill: new ol.style.Fill({
+					color: 'rgba(255, 0, 0, 0.03)',
+				})
+			}),
+		});
+
+		var bbSource = new ol.source.Vector();
+		var bbLayer = new ol.layer.Vector({
+			source: bbSource,
+			style: new ol.style.Style({
+				stroke: new ol.style.Stroke({
+					width: 1,
+					color: '#000000'
+				})
+			})
+		});
+		
+		var map = new ol.Map({
+			target: 'map',
+			layers: [
+				new ol.layer.Tile({
+					source: new ol.source.OSM()
+				}),
+				bbLayer,
+				cellLayer
+			],
+			view: new ol.View({
+				center: ol.proj.fromLonLat([13.7373, 51.0504]),
+				zoom: 8,
+			})
+		});
+
+		function h3IndexToBinary(idx) {
+			var bin = "";
+			for (var i = 0; i < idx.length; ++i) {
+				bin += parseInt(idx[i], 16).toString(2).padStart(4, '0') + "";
+			}
+			return bin;
+		}
+
+		function visualizeH3(coords) {
+			cellSource.clear();
+			
+			var info = "";
+			for (var lvl = 0; lvl < 16; ++lvl) {
+				var idx = h3Js.geoToH3(coords[1], coords[0], lvl);
+
+				info += lvl + ":\t" + idx + "  " + h3IndexToBinary(idx) + "\n";
+				
+				var verts = h3Js.h3ToGeoBoundary(idx);
+				verts.push(verts[0]);
+
+				for (var i = 0; i < verts.length; ++i)
+					verts[i] = ol.proj.fromLonLat([verts[i][1], verts[i][0]])
+
+				var poly = new ol.geom.Polygon([verts]);
+				var feature = new ol.Feature(poly);
+				cellSource.addFeature(feature);
+			}
+
+			document.getElementById('info').innerHTML = info;
+		}
+
+		map.on('singleclick', function (evt) {
+			var coords = ol.proj.toLonLat(evt.coordinate);
+			visualizeH3(coords);
+		});
+
+
+
+		// Visualize bound box
+		function visualizeViewBoundBox(bbVerts) {
+			for (var i = 0; i < bbVerts.length; ++i)
+				bbVerts[i] = ol.proj.fromLonLat(bbVerts[i]);
+
+			var poly = new ol.geom.Polygon([bbVerts]);
+			var feature = new ol.Feature(poly);
+			bbSource.addFeature(feature);
+			
+		}
+
+		/*visualizeViewBoundBox([
+			[13.656273184546308, 51.07433083078422],
+			[13.821068106419972, 51.07433083078422],
+			[13.821068106419972, 51.02474406787164],
+			[13.656273184546308, 51.02474406787164]
+		]);*/
+
+
+
+		
+
+		function visualizeCells(indices) {
+			console.debug(indices.length);
+
+			var counts = {};
+			indices.forEach(function(x) { counts[x] = (counts[x] || 0)+1; });
+
+			console.debug(counts);
+
+
+			for (var i = 0; i < indices.length; ++i) {
+				var idx = indices[i];
+				console.debug(i);
+				//var idx = "841f1b5ffffffff";
+				var verts = h3Js.h3ToGeoBoundary(idx);
+				verts.push(verts[0]);
+				for (var j = 0; j < verts.length; ++j)
+					verts[j] = ol.proj.fromLonLat([verts[j][1], verts[j][0]]);
+				
+				var poly = new ol.geom.Polygon([verts]);
+				var feature = new ol.Feature(poly);
+				cellSource.addFeature(feature);
+			}
+		}
+
+		//visualizeCells(["861f1b467ffffff","861f1b55fffffff","861f1b477ffffff","861f1b447ffffff","861f1b46fffffff","861f1b097ffffff","861f1b54fffffff","861f1b547ffffff","861f1b557ffffff","861f1b42fffffff","861f1b40fffffff","861f1b457ffffff","861f1b45fffffff","861f1b44fffffff","861f1b737ffffff","861f1b09fffffff","861f1b087ffffff","861f1b0b7ffffff","861f1b56fffffff"]);
+
+
+	</script>
+</body>
+</html>
